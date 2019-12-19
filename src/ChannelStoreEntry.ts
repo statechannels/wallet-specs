@@ -1,5 +1,5 @@
 import { Channel, getChannelId, SignedState, State } from '.';
-import { Participant } from './store';
+import { Participant, supported } from './store';
 
 interface DirectFunding {
   type: 'Direct';
@@ -42,8 +42,7 @@ export function isGuarantee(funding: Funding): funding is Guaranteed {
 }
 
 export interface IChannelStoreEntry {
-  supportedState: SignedState[];
-  unsupportedStates: SignedState[];
+  states: SignedState[];
   privateKey: string;
   participants: Participant[];
   channel: Channel;
@@ -51,8 +50,7 @@ export interface IChannelStoreEntry {
 }
 
 export class ChannelStoreEntry implements IChannelStoreEntry {
-  public supportedState: SignedState[];
-  public unsupportedStates: SignedState[];
+  public readonly states: SignedState[] = [];
   public privateKey: string;
   public participants: Participant[];
   public funding?: Funding;
@@ -67,23 +65,20 @@ export class ChannelStoreEntry implements IChannelStoreEntry {
     } else {
       throw new Error('Required arguments missing');
     }
-    this.supportedState = args.supportedState || [];
-    this.unsupportedStates = args.unsupportedStates || [];
+    this.states = args.states || [];
     this.funding = args.funding;
   }
 
   get args(): IChannelStoreEntry {
     const {
-      supportedState,
-      unsupportedStates,
+      states,
       privateKey,
       participants,
       channel,
       funding,
     }: IChannelStoreEntry = this;
     return {
-      supportedState,
-      unsupportedStates,
+      states,
       privateKey,
       participants,
       channel,
@@ -95,6 +90,15 @@ export class ChannelStoreEntry implements IChannelStoreEntry {
     return this.participants.findIndex(
       p => p.signingAddress === this.privateKey
     );
+  }
+
+  get unsupportedStates(): SignedState[] {
+    return this.states.filter(s => !supported(s));
+  }
+
+  get supportedState(): SignedState[] {
+    // TODO: implementing this correctly requires implementing signatures
+    return this.states.filter(supported);
   }
 
   get latestSupportedState(): State | undefined {
@@ -114,9 +118,6 @@ export class ChannelStoreEntry implements IChannelStoreEntry {
     return getChannelId(this.channel);
   }
 
-  get states(): SignedState[] {
-    return this.unsupportedStates.concat(this.supportedState);
-  }
   get latestState(): State {
     if (!this.states.length) {
       throw new Error('No states found');

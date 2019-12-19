@@ -91,7 +91,7 @@ export const machine: MachineFactory<Init, any> = (store, context: Init) => {
     const privateKey = store.getPrivateKey(
       participants.map(p => p.participantId)
     );
-    const unsupportedStates: SignedState[] = [
+    const states: SignedState[] = [
       {
         state: {
           turnNum: 0,
@@ -108,7 +108,7 @@ export const machine: MachineFactory<Init, any> = (store, context: Init) => {
         channel,
         privateKey,
         participants,
-        unsupportedStates,
+        states,
       })
     );
 

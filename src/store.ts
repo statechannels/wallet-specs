@@ -282,34 +282,21 @@ export class Store implements IStore {
     states: SignedState[]
   ): ChannelStoreEntry {
     // TODO: This currently assumes that support comes from consensus on a single state
-    let supportedState: SignedState[] = [];
-    let unsupportedStates: SignedState[] = [];
     const entry = this.maybeGetEntry(channelId);
+    let currentStates: SignedState[] = [];
     if (entry) {
-      ({ supportedState, unsupportedStates } = entry);
+      ({ states: currentStates } = entry);
     } else {
       const { participants, channelNonce } = states[0].state.channel;
       this.useNonce(participants, channelNonce);
     }
 
-    unsupportedStates = merge(unsupportedStates, states);
-
-    const nowSupported = unsupportedStates
-      .filter(supported)
-      .sort(s => -s.state.turnNum);
-
-    supportedState = nowSupported.length ? [nowSupported[0]] : supportedState;
-    if (supportedState.length > 0) {
-      unsupportedStates = unsupportedStates.filter(
-        s => s.state.turnNum > supportedState[0].state.turnNum
-      );
-    }
+    states = merge(currentStates, states);
 
     if (entry) {
       this._store[channelId] = {
         ...this._store[channelId],
-        supportedState,
-        unsupportedStates,
+        states,
       };
     } else {
       const { channel } = states[0].state;
@@ -321,8 +308,7 @@ export class Store implements IStore {
       }));
       const privateKey = this.getPrivateKey(participants);
       this._store[channelId] = {
-        supportedState,
-        unsupportedStates,
+        states,
         privateKey,
         participants: entryParticipants,
         channel,
@@ -348,10 +334,17 @@ function merge(left: SignedState[], right: SignedState[]): SignedState[] {
     }
   });
 
+  // TODO: This assumes that support comes from everyone signing a single state.
+  const supportedStates = left.filter(supported);
+  const supportedState = supportedStates[supportedStates.length - 1];
+  if (supportedState) {
+    left = left.filter(s => s.state.turnNum >= supportedState.state.turnNum);
+  }
+
   return left;
 }
 
-function supported(signedState: SignedState) {
+export function supported(signedState: SignedState) {
   // TODO: temporarily just check the required length
   return (
     signedState.signatures.filter(Boolean).length ===
